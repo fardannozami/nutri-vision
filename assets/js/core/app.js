@@ -227,7 +227,7 @@ class NutriApp {
           const nutritionData = await this.generator.generateNutrition(detectionResult.className);
           this.ui.updateNutritionState('success', nutritionData.nutritionFact)
         } catch (error) {
-          logError('Gagal menghasilkan konten nutrisi', nutritionError);
+          logError('Gagal menghasilkan konten nutrisi', error);
           this.ui.updateNutritionState('error');
         }
 

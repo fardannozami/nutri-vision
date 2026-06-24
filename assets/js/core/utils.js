@@ -112,7 +112,8 @@ export const updatePerformanceStats = (stats, operationTime) => {
 };
 
 export const logPerformance = (type, backend, operationTime, averageTime) => {
-  console.log(`⚡ ${type} - ${backend.toUpperCase()}: ${Math.round(operationTime)}ms (avg: ${Math.round(averageTime)}ms)`);
+  const backendStr = backend ? String(backend).toUpperCase() : 'UNKNOWN';
+  console.log(`⚡ ${type} - ${backendStr}: ${Math.round(operationTime)}ms (avg: ${Math.round(averageTime)}ms)`);
 };
 
 export const createPerformanceResult = (operationTime, backend, averageTime, totalOperations) => ({
