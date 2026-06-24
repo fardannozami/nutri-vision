@@ -1,7 +1,11 @@
+import CameraService from '../services/camera.service.js';
+import DetectionService from '../services/detection.service.js';
+import NutritionService from '../services/nutrition.service.js';
 import UIHandler from '../ui/ui.handler.js';
 import { APP_CONFIG } from './config.js';
 import {
   createDelay,
+  isValidDetection,
   logError
 } from './utils.js';
 
@@ -40,13 +44,30 @@ class NutriApp {
   /**
    * TODO:
    * Lengkapi fungsi init untuk menginisialisasi kemampuan aplikasi:
-   * [] Kemampuan deteksi (DetectionService)
-   * [] Kamera (CameraService)
-   * [] Kemampuan generatif (NutritionService)
+   * [✓] Kemampuan deteksi (DetectionService)
+   * [✓] Kamera (CameraService)
+   * [✓] Kemampuan generatif (NutritionService)
   */
   async init() {
     try {
       this.ui.showStatus('Memuat Model AI...');
+
+      this.detector = new DetectionService();
+      await this.detector.loadModel();
+
+      this.camera = new CameraService();
+
+      this.generator = new NutritionService(this.ui);
+
+      try {
+        await this.generator.loadModel();
+      } catch (error) {
+        logError('Layanan nutrisi gagal dimuat (mode offline?)', error);
+        this.generator = null;
+      }
+
+      this.ui.showStatus('Model AI Siap');
+      this.ui.enableButton();
 
     } catch (error) {
       logError('Gagal menginisialisasi aplikasi', error);
@@ -121,8 +142,8 @@ class NutriApp {
   /**
    * TODO:
    * Tambahkan logika utama untuk proses deteksi dan generatif di dalam detectLoop.
-   * [] Deteksi objek menggunakan this.detector.predict().
-   * [] Jika deteksi valid menggunakan isValidDetection(), lalu hentikan loop deteksi.
+   * [✓] Deteksi objek menggunakan this.detector.predict().
+   * [✓] Jika deteksi valid menggunakan isValidDetection(), lalu hentikan loop deteksi.
    * [] Panggil method this.generateAndShowResults() untuk menampilkan hasil deteksi dan generasi nutrisi.
   */
   async detectLoop(loopId) {
@@ -146,6 +167,16 @@ class NutriApp {
         return;
       }
 
+      const result = await this.detector.predict(canvas);
+      console.log('Result Deteksi', result);
+
+      if (isValidDetection(result)) {
+        this.stopDetection();
+        this.ui.switchToState('analyzing');
+        await createDelay(this.config.analyzingDelay);
+        await this.generateAndShowResults(result);
+      }
+
     } catch (error) {
       logError('Deteksi error', error);
     }
@@ -157,10 +188,10 @@ class NutriApp {
 
   /**
    * TODO:
-   * [] Panggil method this.generator.generateNutrition() pada detection.service.js.
-   * [] Kirimkan hasil deteksi (detectionResult.className) sebagai parameter.
-   * [] Tampilkan hasil generasi nutrisi pada UI menggunakan this.ui.updateNutritionState().
-   * [] Tangani error jika proses generasi gagal.
+   * [✓] Panggil method this.generator.generateNutrition() pada detection.service.js.
+   * [✓] Kirimkan hasil deteksi (detectionResult.className) sebagai parameter.
+   * [✓] Tampilkan hasil generasi nutrisi pada UI menggunakan this.ui.updateNutritionState().
+   * [✓] Tangani error jika proses generasi gagal.
   */
   async generateAndShowResults(detectionResult) {
     try {
@@ -178,6 +209,14 @@ class NutriApp {
       if (this.generator && this.generator.isReady()) {
         await createDelay(this.config.nutritionGenerationDelay);
         this.ui.updateNutritionState('loading');
+
+        try {
+          const nutritionData = await this.generator.generateNutrition(detectionResult.className);
+          this.ui.updateNutritionState('success', nutritionData.nutritionFact)
+        } catch (error) {
+          logError('Gagal menghasilkan konten nutrisi', nutritionError);
+          this.ui.updateNutritionState('error');
+        }
 
       } else {
         this.ui.updateNutritionState('error');
