@@ -3,6 +3,7 @@ import {
   createDelay,
   createModelProgressCallback,
   createPerformanceResult,
+  isWebGPUSupported,
   logError,
   logPerformance,
   updatePerformanceStats
@@ -29,11 +30,15 @@ class NutritionService {
     try {
       const { pipeline } = await import(this.config.cdnUrl);
 
+      const device = isWebGPUSupported() ? 'webgpu' : 'wasm';
+      console.log(`Backend transformer.js yang digunakan : ${device}`)
+
       this.generator = await pipeline(
         'text2text-generation',
         this.config.modelName,
         {
           dtype: "q4",
+          device,
           progress_callback: createModelProgressCallback((progress) => {
             if (this.ui && typeof this.ui.showStatus === 'function') {
               this.ui.showStatus(progress.message);
@@ -71,18 +76,18 @@ class NutritionService {
 
       // Sanitize: Hapus karakter-karakter yang sering digunakan untuk prompt injection
       fruitName = fruitName
-          .replace(/[|]{2,}/g, '')          // Hapus ||| (separator injection)
-          .replace(/[#=]{2,}/g, '')         // Hapus ###, == (marker section)
-          .replace(/(--|\+\+|``)/g, '')     // Hapus --, ++, `` (marker kode)
-          .replace(/\n/g, ' ')              // Hapus newline
-          .trim();
+        .replace(/[|]{2,}/g, '')          // Hapus ||| (separator injection)
+        .replace(/[#=]{2,}/g, '')         // Hapus ###, == (marker section)
+        .replace(/(--|\+\+|``)/g, '')     // Hapus --, ++, `` (marker kode)
+        .replace(/\n/g, ' ')              // Hapus newline
+        .trim();
 
       // Validasi setelah sanitasi
       if (!fruitName || fruitName.length > MAX_LENGTH) {
-          this.ui.showError(`Nama buah harus 1-${MAX_LENGTH} karakter.`);
-          this.ui.enableAllInputs();
-          this.isGenerating = false;
-          return;
+        this.ui.showError(`Nama buah harus 1-${MAX_LENGTH} karakter.`);
+        this.ui.enableAllInputs();
+        this.isGenerating = false;
+        return;
       }
 
       const prompt = `Write a simple nutrition fact about ${fruitName}. Include key nutritional benefits in 1-2 sentences.`;
@@ -96,7 +101,7 @@ class NutritionService {
 
       const endTime = performance.now();
       const generationTime = endTime - startTime;
-      
+
       updatePerformanceStats(this.performanceStats, generationTime);
 
       const generatedText = result[0].generated_text;

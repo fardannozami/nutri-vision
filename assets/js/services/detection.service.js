@@ -5,6 +5,7 @@ import {
   updatePerformanceStats,
   createPerformanceResult,
   logPerformance,
+  isWebGPUSupported,
 } from '../core/utils.js';
 
 class DetectionService {
@@ -23,7 +24,12 @@ class DetectionService {
   */
   async loadModel() {
     try {
+      const backend = isWebGPUSupported() ? 'webgpu' : 'webgl';
+      await tf.setBackend(backend);
       await tf.ready();
+
+      const backendName = tf.getBackend();
+      console.log(`Backend tensorflow.js yang digunakan: ${backendName}`)
 
       const [metadata, model] = await Promise.all([
         fetch(this.config.metadataPath).then(r => r.json()),
@@ -42,6 +48,7 @@ class DetectionService {
         labels: this.labels,
         modelName: metadata.modelName || 'Unknown',
         version: metadata.version || '1.0.0',
+        backend: backendName,
       };
 
     } catch (error) {
